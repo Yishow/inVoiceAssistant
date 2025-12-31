@@ -4,7 +4,7 @@
 """
 import time
 import logging
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from dataclasses import dataclass
 
 try:
@@ -21,6 +21,14 @@ try:
     )
 except ImportError:
     webdriver = None
+    Service = None
+    Options = None
+    By = None
+    WebDriverWait = None
+    EC = None
+    TimeoutException = None
+    ElementClickInterceptedException = None
+    ElementNotInteractableException = None
 
 try:
     from webdriver_manager.chrome import ChromeDriverManager
@@ -28,6 +36,10 @@ except ImportError:
     ChromeDriverManager = None
 
 from .invoice_extractor import InvoiceData
+
+# For type hints only
+if TYPE_CHECKING:
+    from selenium.webdriver import Chrome
 
 
 @dataclass
@@ -63,7 +75,7 @@ class BrowserAutomation:
         """
         self._check_dependencies()
         self.config = config or BrowserConfig()
-        self.driver: Optional[webdriver.Chrome] = None
+        self.driver: Optional["Chrome"] = None
         self.logger = logging.getLogger(__name__)
 
     def _check_dependencies(self):
@@ -73,7 +85,7 @@ class BrowserAutomation:
         if ChromeDriverManager is None:
             raise ImportError("請安裝 webdriver-manager: pip install webdriver-manager")
 
-    def start_browser(self) -> webdriver.Chrome:
+    def start_browser(self) -> "Chrome":
         """
         啟動 Chrome 瀏覽器
 
