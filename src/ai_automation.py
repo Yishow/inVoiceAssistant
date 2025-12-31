@@ -7,8 +7,9 @@ AI 瀏覽器自動化模組
 import json
 import re
 import time
+import datetime
 from typing import Optional, Dict, Any, List, Callable
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from enum import Enum
 
 try:
@@ -17,7 +18,7 @@ try:
 except ImportError:
     HAS_ANTHROPIC = False
 
-from .browser_automation import BrowserAutomation, BrowserConfig, EInvoiceAutomation
+from .browser_automation import EInvoiceAutomation, BrowserConfig
 from .invoice_extractor import InvoiceData
 
 
@@ -522,11 +523,13 @@ class AIBrowserController:
         try:
             from selenium.webdriver.common.by import By
 
-            # 嘗試多種定位方式
+            # 嘗試多種定位方式（使用更精確的選擇器）
             element = None
             selectors = [
                 (By.CSS_SELECTOR, action.target),
-                (By.XPATH, f"//*[contains(text(), '{action.target}')]"),
+                (By.XPATH, f"//button[normalize-space(.) = '{action.target}']"
+                           f" | //a[normalize-space(.) = '{action.target}']"
+                           f" | //input[@value = '{action.target}']"),
                 (By.ID, action.target),
                 (By.NAME, action.target),
             ]
@@ -590,7 +593,6 @@ class AIBrowserController:
                            invoice_data: Optional[InvoiceData]) -> Dict[str, Any]:
         """處理截圖操作"""
         try:
-            import datetime
             filename = action.value or f"screenshot_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             self.browser.take_screenshot(filename)
             return {"success": True, "filename": filename}

@@ -19,13 +19,14 @@ Claude Code 瀏覽器自動化控制腳本
 import argparse
 import json
 import sys
-import time
+import datetime
 from pathlib import Path
+from typing import Optional
 
 # 添加專案路徑
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.ai_automation import AIBrowserController, create_ai_controller, BrowserConfig
+from src.ai_automation import create_ai_controller
 from src.invoice_extractor import InvoiceExtractor, InvoiceData
 
 
@@ -43,7 +44,7 @@ class ClaudeCodeAutomation:
             use_claude=False,  # 使用本地解析器（Claude Code 本身就是 AI）
             headless=headless
         )
-        self.invoice_data: InvoiceData = None
+        self.invoice_data: Optional[InvoiceData] = None
         self.session_started = False
 
     def start(self):
@@ -119,7 +120,6 @@ class ClaudeCodeAutomation:
             print("[ERROR] 瀏覽器尚未啟動")
             return None
 
-        import datetime
         if not filename:
             filename = f"screenshot_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
 
