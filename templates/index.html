@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>發票自動申報助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8ebff;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .upload-hint {
+            color: #999;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            display: none;
+        }
+
+        .result.show {
+            display: block;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .result-title {
+            font-size: 1.3rem;
+            color: #333;
+        }
+
+        .confidence-badge {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .info-section {
+            margin-bottom: 25px;
+        }
+
+        .info-section h3 {
+            color: #667eea;
+            font-size: 1rem;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .info-item {
+            background: #f8f9ff;
+            padding: 12px 15px;
+            border-radius: 8px;
+        }
+
+        .info-label {
+            color: #888;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            color: #333;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .items-table th,
+        .items-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .items-table th {
+            background: #f8f9ff;
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .items-table tr:hover {
+            background: #fafafa;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+            box-shadow: none;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+        }
+
+        footer {
+            text-align: center;
+            color: rgba(255,255,255,0.7);
+            margin-top: 30px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📄 發票自動申報助手</h1>
+
+        <div class="card">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">點擊或拖曳 PDF 發票到此處</div>
+                <div class="upload-hint">支援電子發票 PDF 文件，最大 16MB</div>
+            </div>
+            <input type="file" id="fileInput" accept=".pdf">
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div>正在解析發票，請稍候...</div>
+            </div>
+
+            <div class="error" id="error"></div>
+        </div>
+
+        <div class="card result" id="result">
+            <div class="result-header">
+                <div class="result-title">📋 解析結果</div>
+                <div class="confidence-badge" id="confidence">識別率: 0%</div>
+            </div>
+
+            <div class="info-section">
+                <h3>基本資訊</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">發票號碼</div>
+                        <div class="info-value" id="invoiceNumber">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">發票日期</div>
+                        <div class="info-value" id="invoiceDate">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3>賣方資訊</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">統一編號</div>
+                        <div class="info-value" id="sellerId">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">公司名稱</div>
+                        <div class="info-value" id="sellerName">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3>買方資訊</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">統一編號</div>
+                        <div class="info-value" id="buyerId">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">公司名稱</div>
+                        <div class="info-value" id="buyerName">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3>金額資訊</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">小計（未稅）</div>
+                        <div class="info-value" id="subtotal">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">稅額</div>
+                        <div class="info-value" id="taxAmount">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">總計（含稅）</div>
+                        <div class="info-value" id="totalAmount">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-section" id="itemsSection" style="display: none;">
+                <h3>品項明細</h3>
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>品名</th>
+                            <th>數量</th>
+                            <th>單價</th>
+                            <th>金額</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn-secondary" onclick="resetForm()">重新上傳</button>
+                <button class="btn btn-success" onclick="openEInvoice()">前往電子發票平台</button>
+            </div>
+        </div>
+
+        <footer>
+            發票自動申報助手 v1.0 | 請確認解析結果後再進行申報
+        </footer>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const result = document.getElementById('result');
+
+        // 點擊上傳區域觸發文件選擇
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // 文件選擇處理
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                uploadFile(e.target.files[0]);
+            }
+        });
+
+        // 拖曳事件
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                uploadFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // 上傳文件
+        async function uploadFile(file) {
+            if (!file.name.toLowerCase().endsWith('.pdf')) {
+                showError('只支援 PDF 文件');
+                return;
+            }
+
+            // 顯示載入狀態
+            loading.classList.add('show');
+            error.classList.remove('show');
+            result.classList.remove('show');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayResult(data);
+                } else {
+                    showError(data.error || '解析失敗');
+                }
+            } catch (err) {
+                showError('上傳失敗: ' + err.message);
+            } finally {
+                loading.classList.remove('show');
+            }
+        }
+
+        // 顯示結果
+        function displayResult(data) {
+            document.getElementById('invoiceNumber').textContent = data.invoice_number || '-';
+            document.getElementById('invoiceDate').textContent = data.invoice_date || '-';
+            document.getElementById('sellerId').textContent = data.seller?.id || '-';
+            document.getElementById('sellerName').textContent = data.seller?.name || '-';
+            document.getElementById('buyerId').textContent = data.buyer?.id || '-';
+            document.getElementById('buyerName').textContent = data.buyer?.name || '-';
+
+            const amounts = data.amounts || {};
+            document.getElementById('subtotal').textContent = formatAmount(amounts.subtotal);
+            document.getElementById('taxAmount').textContent = formatAmount(amounts.tax_amount);
+            document.getElementById('totalAmount').textContent = formatAmount(amounts.total);
+
+            document.getElementById('confidence').textContent =
+                '識別率: ' + Math.round((data.confidence || 0) * 100) + '%';
+
+            // 品項明細
+            const items = data.items || [];
+            const itemsSection = document.getElementById('itemsSection');
+            const itemsBody = document.getElementById('itemsBody');
+
+            if (items.length > 0) {
+                itemsBody.innerHTML = items.map(item => `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td>${item.quantity}</td>
+                        <td>${formatAmount(item.unit_price)}</td>
+                        <td>${formatAmount(item.amount)}</td>
+                    </tr>
+                `).join('');
+                itemsSection.style.display = 'block';
+            } else {
+                itemsSection.style.display = 'none';
+            }
+
+            result.classList.add('show');
+        }
+
+        // 格式化金額
+        function formatAmount(amount) {
+            if (amount === undefined || amount === null) return '-';
+            return '$' + Number(amount).toLocaleString('zh-TW');
+        }
+
+        // 顯示錯誤
+        function showError(message) {
+            error.textContent = message;
+            error.classList.add('show');
+        }
+
+        // 重置表單
+        function resetForm() {
+            fileInput.value = '';
+            result.classList.remove('show');
+            error.classList.remove('show');
+        }
+
+        // 開啟電子發票平台
+        function openEInvoice() {
+            window.open('https://www.einvoice.nat.gov.tw/', '_blank');
+        }
+    </script>
+</body>
+</html>
