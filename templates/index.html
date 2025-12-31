@@ -1020,7 +1020,17 @@
             const messagesContainer = document.getElementById('aiMessages');
             const messageEl = document.createElement('div');
             messageEl.className = `ai-message ${type}`;
-            messageEl.innerHTML = content.replace(/\n/g, '<br>');
+            
+            // 安全地處理文字與換行，避免使用 innerHTML 造成 XSS 風險
+            const text = String(content ?? '');
+            const lines = text.split('\n');
+            lines.forEach((line, index) => {
+                if (index > 0) {
+                    messageEl.appendChild(document.createElement('br'));
+                }
+                messageEl.appendChild(document.createTextNode(line));
+            });
+            
             messagesContainer.appendChild(messageEl);
 
             // 滾動到底部
@@ -1047,24 +1057,37 @@
         }
 
         // 更新 displayResult 函數，保存發票資料
-        const originalDisplayResult = displayResult;
-        displayResult = function(data) {
-            originalDisplayResult(data);
+        (function () {
+            const globalObj = window;
+            const originalDisplayResult = globalObj.displayResult;
 
-            // 儲存發票資料供 AI 使用
-            currentInvoiceData = {
-                invoice_number: data.invoice_number,
-                invoice_date: data.invoice_date,
-                seller_id: data.seller?.id,
-                seller_name: data.seller?.name,
-                buyer_id: data.buyer?.id,
-                buyer_name: data.buyer?.name,
-                subtotal: data.amounts?.subtotal,
-                tax_amount: data.amounts?.tax_amount,
-                total_amount: data.amounts?.total,
-                items: data.items
-            };
-        };
+            // 僅在 displayResult 為函數且尚未被包裝時進行包裝
+            if (typeof originalDisplayResult === 'function' && !originalDisplayResult._hasInvoiceDataWrapper) {
+                function wrappedDisplayResult(data) {
+                    // 保留原本的 this 內容與行為
+                    originalDisplayResult.call(this, data);
+
+                    // 儲存發票資料供 AI 使用
+                    currentInvoiceData = {
+                        invoice_number: data.invoice_number,
+                        invoice_date: data.invoice_date,
+                        seller_id: data.seller?.id,
+                        seller_name: data.seller?.name,
+                        buyer_id: data.buyer?.id,
+                        buyer_name: data.buyer?.name,
+                        subtotal: data.amounts?.subtotal,
+                        tax_amount: data.amounts?.tax_amount,
+                        total_amount: data.amounts?.total,
+                        items: data.items
+                    };
+                }
+
+                // 標記已包裝，避免重複包裝
+                wrappedDisplayResult._hasInvoiceDataWrapper = true;
+
+                globalObj.displayResult = wrappedDisplayResult;
+            }
+        })();
 
         // 頁面載入時檢查 AI 狀態
         document.addEventListener('DOMContentLoaded', function() {

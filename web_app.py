@@ -7,13 +7,15 @@
 """
 import os
 import json
+import base64
+import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional
 from flask import Flask, request, render_template, jsonify, redirect, url_for
 
 from config import UPLOAD_DIR, ALLOWED_EXTENSIONS
 from src import InvoiceExtractor
-from src.ai_automation import AIBrowserController, create_ai_controller, BrowserConfig
+from src.ai_automation import AIBrowserController, create_ai_controller
 from src.invoice_extractor import InvoiceData
 
 app = Flask(__name__)
@@ -115,6 +117,13 @@ def health():
 
 
 # ============ AI 自動化 API ============
+# 
+# 安全性警告：
+# 1. 這些端點目前缺少身份驗證和授權機制
+# 2. 全域變數非執行緒安全，不適合多用戶並發使用
+# 3. 瀏覽器會話沒有自動清理機制（需手動停止或實作超時）
+# 4. 生產環境應實作：認證、速率限制、會話管理、輸入驗證
+# 
 
 @app.route("/api/ai/start", methods=["POST"])
 def start_ai_session():
@@ -137,8 +146,8 @@ def start_ai_session():
         if ai_controller:
             try:
                 ai_controller.end_session()
-            except Exception:
-                pass
+            except Exception as e:
+                app.logger.exception("Failed to end existing AI session before starting a new one")
 
         # 創建新控制器
         ai_controller = create_ai_controller(
@@ -172,7 +181,6 @@ def stop_ai_session():
     if ai_controller:
         try:
             ai_controller.end_session()
-            ai_controller = None
             return jsonify({
                 "success": True,
                 "message": "會話已結束"
@@ -182,6 +190,8 @@ def stop_ai_session():
                 "success": False,
                 "error": str(e)
             }), 500
+        finally:
+            ai_controller = None
     else:
         return jsonify({
             "success": True,
@@ -225,8 +235,9 @@ def execute_ai_prompt():
     if data.get("invoice_data"):
         try:
             invoice_data = InvoiceData(**data["invoice_data"])
-        except Exception:
-            pass
+        except (TypeError, ValueError, KeyError) as e:
+            app.logger.exception("Failed to create InvoiceData from input: %r", data.get("invoice_data"))
+            invoice_data = None
     elif current_invoice_data:
         invoice_data = current_invoice_data
 
@@ -272,9 +283,6 @@ def take_screenshot():
         }), 400
 
     try:
-        import datetime
-        import base64
-
         # 取得截圖
         screenshot = ai_controller.browser.driver.get_screenshot_as_base64()
 
