@@ -9,6 +9,8 @@ webdriver-manager>=4.0.0
 # Web 介面
 flask>=3.0.0
 werkzeug>=3.0.0
+flask-limiter>=3.5.0
+flask-wtf>=1.2.0
 
 # 資料處理
 pandas>=2.0.0

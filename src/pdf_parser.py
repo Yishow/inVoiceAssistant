@@ -3,7 +3,6 @@ PDF 解析模組 - 提取 PDF 發票內容
 """
 import re
 from pathlib import Path
-from typing import Optional
 from dataclasses import dataclass, field
 
 try:

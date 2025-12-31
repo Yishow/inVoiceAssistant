@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>發票自動申報助手</title>
     <style>
         * {
@@ -259,22 +260,22 @@
         <h1>📄 發票自動申報助手</h1>
 
         <div class="card">
-            <div class="upload-area" id="uploadArea">
+            <div class="upload-area" id="uploadArea" tabindex="0" role="button" aria-label="點擊或拖曳 PDF 發票到此處上傳">
                 <div class="upload-icon">📁</div>
                 <div class="upload-text">點擊或拖曳 PDF 發票到此處</div>
                 <div class="upload-hint">支援電子發票 PDF 文件，最大 16MB</div>
             </div>
-            <input type="file" id="fileInput" accept=".pdf">
+            <input type="file" id="fileInput" accept=".pdf" aria-label="上傳發票 PDF 檔案">
 
-            <div class="loading" id="loading">
+            <div class="loading" id="loading" aria-live="polite" aria-busy="false">
                 <div class="spinner"></div>
                 <div>正在解析發票，請稍候...</div>
             </div>
 
-            <div class="error" id="error"></div>
+            <div class="error" id="error" role="alert"></div>
         </div>
 
-        <div class="card result" id="result">
+        <div class="card result" id="result" aria-live="polite">
             <div class="result-header">
                 <div class="result-title">📋 解析結果</div>
                 <div class="confidence-badge" id="confidence">識別率: 0%</div>
@@ -377,6 +378,14 @@
         // 點擊上傳區域觸發文件選擇
         uploadArea.addEventListener('click', () => fileInput.click());
 
+        // 鍵盤支援：按 Enter 或 Space 觸發文件選擇
+        uploadArea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                fileInput.click();
+            }
+        });
+
         // 文件選擇處理
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
@@ -411,15 +420,22 @@
 
             // 顯示載入狀態
             loading.classList.add('show');
+            loading.setAttribute('aria-busy', 'true');
             error.classList.remove('show');
             result.classList.remove('show');
 
             const formData = new FormData();
             formData.append('file', file);
 
+            // 取得 CSRF token
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
             try {
                 const response = await fetch('/upload', {
                     method: 'POST',
+                    headers: csrfToken ? {
+                        'X-CSRFToken': csrfToken
+                    } : {},
                     body: formData
                 });
 
@@ -434,6 +450,7 @@
                 showError('上傳失敗: ' + err.message);
             } finally {
                 loading.classList.remove('show');
+                loading.setAttribute('aria-busy', 'false');
             }
         }
 
@@ -460,14 +477,31 @@
             const itemsBody = document.getElementById('itemsBody');
 
             if (items.length > 0) {
-                itemsBody.innerHTML = items.map(item => `
-                    <tr>
-                        <td>${item.name}</td>
-                        <td>${item.quantity}</td>
-                        <td>${formatAmount(item.unit_price)}</td>
-                        <td>${formatAmount(item.amount)}</td>
-                    </tr>
-                `).join('');
+                // 清空現有內容
+                itemsBody.textContent = '';
+
+                // 安全地建立表格行，避免 XSS 攻擊
+                items.forEach(item => {
+                    const row = document.createElement('tr');
+
+                    const nameCell = document.createElement('td');
+                    nameCell.textContent = item.name || '';
+                    row.appendChild(nameCell);
+
+                    const quantityCell = document.createElement('td');
+                    quantityCell.textContent = item.quantity || '';
+                    row.appendChild(quantityCell);
+
+                    const unitPriceCell = document.createElement('td');
+                    unitPriceCell.textContent = formatAmount(item.unit_price);
+                    row.appendChild(unitPriceCell);
+
+                    const amountCell = document.createElement('td');
+                    amountCell.textContent = formatAmount(item.amount);
+                    row.appendChild(amountCell);
+
+                    itemsBody.appendChild(row);
+                });
                 itemsSection.style.display = 'block';
             } else {
                 itemsSection.style.display = 'none';

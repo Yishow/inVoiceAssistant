@@ -21,7 +21,7 @@ import json
 import sys
 from pathlib import Path
 
-from src import PDFParser, InvoiceExtractor, BrowserAutomation
+from src import InvoiceExtractor
 from src.browser_automation import EInvoiceAutomation, BrowserConfig
 
 
@@ -200,7 +200,12 @@ def run_cli():
     if args.web:
         print("🌐 正在啟動 Web 介面...")
         from web_app import app
-        app.run(host="0.0.0.0", port=5000, debug=True)
+        import os
+        # Only enable debug mode in development environments
+        debug_mode = os.environ.get("FLASK_ENV") == "development" or os.environ.get("FLASK_DEBUG") == "1"
+        # Use 127.0.0.1 for local development instead of 0.0.0.0
+        # For production deployment, use a proper WSGI server like gunicorn
+        app.run(host="127.0.0.1", port=5000, debug=debug_mode)
         return
 
     # 處理 PDF 文件

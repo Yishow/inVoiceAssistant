@@ -3,6 +3,7 @@
 用於自動登入財政部電子發票平台並填寫發票資料
 """
 import time
+import logging
 from typing import Optional
 from dataclasses import dataclass
 
@@ -11,13 +12,12 @@ try:
     from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.common.by import By
-    from selenium.webdriver.common.keys import Keys
-    from selenium.webdriver.support.ui import WebDriverWait, Select
+    from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.common.exceptions import (
         TimeoutException,
-        NoSuchElementException,
-        WebDriverException,
+        ElementClickInterceptedException,
+        ElementNotInteractableException,
     )
 except ImportError:
     webdriver = None
@@ -64,6 +64,7 @@ class BrowserAutomation:
         self._check_dependencies()
         self.config = config or BrowserConfig()
         self.driver: Optional[webdriver.Chrome] = None
+        self.logger = logging.getLogger(__name__)
 
     def _check_dependencies(self):
         """檢查必要的套件"""
@@ -87,6 +88,11 @@ class BrowserAutomation:
 
         options.add_argument(f"--window-size={self.config.window_width},{self.config.window_height}")
         options.add_argument("--disable-gpu")
+        
+        # 安全警告：以下選項會降低瀏覽器安全隔離
+        # --no-sandbox: 停用沙盒機制，僅應在受控環境（如 Docker 容器）中使用
+        # --disable-dev-shm-usage: 停用 /dev/shm 使用，避免記憶體不足問題
+        # 在生產環境中應謹慎評估這些選項的安全風險
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
 
@@ -160,11 +166,20 @@ class BrowserAutomation:
         return wait.until(conditions[condition]((by, value)))
 
     def safe_click(self, element):
-        """安全點擊元素"""
+        """
+        安全點擊元素
+        
+        Args:
+            element: 要點擊的元素
+        
+        Raises:
+            Exception: 如果點擊失敗且 JavaScript 點擊也失敗
+        """
         try:
             element.click()
-        except Exception:
-            # 如果一般點擊失敗，使用 JavaScript 點擊
+        except (ElementClickInterceptedException, ElementNotInteractableException) as e:
+            # 如果一般點擊失敗（被遮蔽或無法互動），使用 JavaScript 點擊
+            self.logger.warning(f"元素點擊被攔截，嘗試使用 JavaScript 點擊: {e}")
             self.driver.execute_script("arguments[0].click();", element)
 
     def safe_send_keys(self, element, text: str, clear_first: bool = True):
@@ -191,21 +206,27 @@ class BrowserAutomation:
             invoice_data: 發票資料
 
         Returns:
-            bool: 是否填寫成功
+            bool: 是否填寫成功（所有關鍵欄位都成功填寫）
         """
+        # 追蹤填寫成功的欄位
+        filled_fields = []
+        failed_fields = []
+        
         try:
             # 注意：以下是範例代碼，實際的元素定位需要
             # 根據財政部網站的實際 HTML 結構進行調整
 
-            # 填寫發票號碼
+            # 填寫發票號碼（關鍵欄位）
             if invoice_data.invoice_number:
                 try:
                     invoice_num_field = self.wait_for_element(
                         By.ID, "invoiceNumber", timeout=5
                     )
                     self.safe_send_keys(invoice_num_field, invoice_data.invoice_number)
+                    filled_fields.append("invoice_number")
                 except TimeoutException:
-                    print("找不到發票號碼欄位")
+                    self.logger.warning("找不到發票號碼欄位")
+                    failed_fields.append("invoice_number")
 
             # 填寫發票日期
             if invoice_data.invoice_date:
@@ -214,8 +235,10 @@ class BrowserAutomation:
                         By.ID, "invoiceDate", timeout=5
                     )
                     self.safe_send_keys(date_field, invoice_data.invoice_date)
+                    filled_fields.append("invoice_date")
                 except TimeoutException:
-                    print("找不到發票日期欄位")
+                    self.logger.warning("找不到發票日期欄位")
+                    failed_fields.append("invoice_date")
 
             # 填寫賣方統一編號
             if invoice_data.seller_id:
@@ -224,8 +247,10 @@ class BrowserAutomation:
                         By.ID, "sellerTaxId", timeout=5
                     )
                     self.safe_send_keys(seller_id_field, invoice_data.seller_id)
+                    filled_fields.append("seller_id")
                 except TimeoutException:
-                    print("找不到賣方統編欄位")
+                    self.logger.warning("找不到賣方統編欄位")
+                    failed_fields.append("seller_id")
 
             # 填寫買方統一編號
             if invoice_data.buyer_id:
@@ -234,18 +259,22 @@ class BrowserAutomation:
                         By.ID, "buyerTaxId", timeout=5
                     )
                     self.safe_send_keys(buyer_id_field, invoice_data.buyer_id)
+                    filled_fields.append("buyer_id")
                 except TimeoutException:
-                    print("找不到買方統編欄位")
+                    self.logger.warning("找不到買方統編欄位")
+                    failed_fields.append("buyer_id")
 
-            # 填寫金額
+            # 填寫金額（關鍵欄位）
             if invoice_data.total_amount > 0:
                 try:
                     amount_field = self.wait_for_element(
                         By.ID, "totalAmount", timeout=5
                     )
                     self.safe_send_keys(amount_field, str(invoice_data.total_amount))
+                    filled_fields.append("total_amount")
                 except TimeoutException:
-                    print("找不到金額欄位")
+                    self.logger.warning("找不到金額欄位")
+                    failed_fields.append("total_amount")
 
             # 填寫稅額
             if invoice_data.tax_amount > 0:
@@ -254,13 +283,28 @@ class BrowserAutomation:
                         By.ID, "taxAmount", timeout=5
                     )
                     self.safe_send_keys(tax_field, str(invoice_data.tax_amount))
+                    filled_fields.append("tax_amount")
                 except TimeoutException:
-                    print("找不到稅額欄位")
+                    self.logger.warning("找不到稅額欄位")
+                    failed_fields.append("tax_amount")
+
+            # 記錄填寫結果
+            self.logger.info(f"成功填寫欄位: {filled_fields}")
+            if failed_fields:
+                self.logger.warning(f"無法填寫欄位: {failed_fields}")
+
+            # 關鍵欄位：發票號碼和金額必須成功填寫
+            critical_fields = ["invoice_number", "total_amount"]
+            critical_failed = [f for f in critical_fields if f in failed_fields]
+            
+            if critical_failed:
+                self.logger.error(f"關鍵欄位填寫失敗: {critical_failed}")
+                return False
 
             return True
 
         except Exception as e:
-            print(f"填寫表單時發生錯誤: {e}")
+            self.logger.error(f"填寫表單時發生錯誤: {e}", exc_info=True)
             return False
 
     def take_screenshot(self, filename: str):

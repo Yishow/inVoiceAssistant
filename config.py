@@ -1,7 +1,6 @@
 """
 發票自動申報助手 - 配置文件
 """
-import os
 from pathlib import Path
 
 # 專案根目錄
@@ -9,7 +8,10 @@ BASE_DIR = Path(__file__).parent.absolute()
 
 # 上傳目錄
 UPLOAD_DIR = BASE_DIR / "uploads"
-UPLOAD_DIR.mkdir(exist_ok=True)
+try:
+    UPLOAD_DIR.mkdir(exist_ok=True)
+except (PermissionError, OSError) as e:
+    raise RuntimeError(f"無法建立上傳目錄 {UPLOAD_DIR}: {e}") from e
 
 # 允許的文件類型
 ALLOWED_EXTENSIONS = {".pdf"}
