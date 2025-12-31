@@ -18,6 +18,7 @@
 """
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -200,7 +201,6 @@ def run_cli():
     if args.web:
         print("🌐 正在啟動 Web 介面...")
         from web_app import app
-        import os
         # Only enable debug mode in development environments
         debug_mode = os.environ.get("FLASK_ENV") == "development" or os.environ.get("FLASK_DEBUG") == "1"
         # Use 127.0.0.1 for local development instead of 0.0.0.0

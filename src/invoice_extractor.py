@@ -268,7 +268,8 @@ class InvoiceExtractor:
         for digit_char, weight in zip(tax_id, weights):
             product = int(digit_char) * weight
             # 將乘積的各位數字相加（例如 12 -> 1 + 2）
-            total += product // 10 + product % 10
+            q, r = divmod(product, 10)
+            total += q + r
 
         # 基本規則：總和能被 10 整除
         if total % 10 == 0:

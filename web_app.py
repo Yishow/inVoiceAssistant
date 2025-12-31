@@ -154,7 +154,6 @@ def health():
 
 
 if __name__ == "__main__":
-    import os
     # Only enable debug mode in development environments
     debug_mode = os.environ.get("FLASK_ENV") == "development" or os.environ.get("FLASK_DEBUG") == "1"
     # Use 127.0.0.1 for local development instead of 0.0.0.0
