@@ -13,5 +13,8 @@ werkzeug>=3.0.0
 # 資料處理
 pandas>=2.0.0
 
+# AI 整合（可選）
+anthropic>=0.18.0
+
 # 工具類
 python-dotenv>=1.0.0
